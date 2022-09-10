@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-
+	"io/ioutil"
 	"github.com/bjdgyc/anylink/admin"
 )
 
@@ -21,9 +21,15 @@ func LinkHome(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// w.WriteHeader(http.StatusOK)
-	// fmt.Fprintln(w, "AnyLink 是一个企业级远程办公 sslvpn 的软件，可以支持多人同时在线使用。")
-	http.Redirect(w, r, "https://henchat.net", 301)
+	filepath := "./index.htm"
+	content ,err :=ioutil.ReadFile(filepath)
+	if err !=nil {
+		http.Redirect(w, r, "https://henchat.net", 301)
+	} else {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintln(w, content)
+	}
+
 }
 
 func LinkOtpQr(w http.ResponseWriter, r *http.Request) {

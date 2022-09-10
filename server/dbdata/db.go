@@ -25,7 +25,7 @@ func initDb() {
 	}
 
 	// 初始化数据库
-	err = xdb.Sync2(&User{}, &Setting{}, &Group{}, &IpMap{}, &AccessAudit{})
+	err = xdb.Sync2(&User{}, &Setting{}, &Group{}, &IpMap{}, &AccessAudit{}, &Policy{})
 	if err != nil {
 		base.Fatal(err)
 	}
@@ -111,7 +111,7 @@ func addInitData() error {
 		Name:         "ops",
 		AllowLan:     true,
 		ClientDns:    []ValData{{Val: "114.114.114.114"}},
-		RouteInclude: []ValData{{Val: "10.0.0.0/8"}},
+		RouteInclude: []ValData{{Val: All}},
 	}
 	err = SetGroup(&g1)
 	if err != nil {

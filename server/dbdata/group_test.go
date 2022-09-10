@@ -24,8 +24,41 @@ func TestGetGroupNames(t *testing.T) {
 	err = SetGroup(&g3)
 	ast.Nil(err)
 
+	authData := map[string]interface{}{
+		"type": "radius",
+		"radius": map[string]string{
+			"addr":   "192.168.8.12:1044",
+			"secret": "43214132",
+		},
+	}
+	g4 := Group{Name: "g4", ClientDns: []ValData{{Val: "114.114.114.114"}}, Auth: authData}
+	err = SetGroup(&g4)
+	ast.Nil(err)
+	g5 := Group{Name: "g5", ClientDns: []ValData{{Val: "114.114.114.114"}}, DsIncludeDomains: "baidu.com,163.com"}
+	err = SetGroup(&g5)
+	ast.Nil(err)
+	g6 := Group{Name: "g6", ClientDns: []ValData{{Val: "114.114.114.114"}}, DsExcludeDomains: "com.cn,qq.com"}
+	err = SetGroup(&g6)
+	ast.Nil(err)
+
+	authData = map[string]interface{}{
+		"type": "ldap",
+		"ldap": map[string]interface{}{
+			"addr":        "192.168.8.12:389",
+			"tls":         true,
+			"bind_name":   "userfind@abc.com",
+			"bind_pwd":    "afdbfdsafds",
+			"base_dn":     "dc=abc,dc=com",
+			"search_attr": "sAMAccountName",
+			"member_of":   "cn=vpn,cn=user,dc=abc,dc=com",
+		},
+	}
+	g7 := Group{Name: "g7", ClientDns: []ValData{{Val: "114.114.114.114"}}, Auth: authData}
+	err = SetGroup(&g7)
+	ast.Nil(err)
+
 	// 判断所有数据
-	gAll := []string{"g1", "g2", "g3"}
+	gAll := []string{"g1", "g2", "g3", "g4", "g5", "g6", "g7"}
 	gs := GetGroupNames()
 	for _, v := range gs {
 		ast.Equal(true, utils.InArrStr(gAll, v))
