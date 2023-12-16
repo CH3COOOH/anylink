@@ -1,4 +1,4 @@
-# AnyLink
+# AnyLink-S
 
 [![Go](https://github.com/bjdgyc/anylink/workflows/Go/badge.svg?branch=main)](https://github.com/bjdgyc/anylink/actions)
 [![PkgGoDev](https://pkg.go.dev/badge/github.com/bjdgyc/anylink)](https://pkg.go.dev/github.com/bjdgyc/anylink)
@@ -10,6 +10,9 @@
 ![LICENSE](https://img.shields.io/github/license/bjdgyc/anylink)
 
 AnyLink 是一个企业级远程办公 sslvpn 的软件，可以支持多人同时在线使用。
+
+## What is "S"
+This is a modified version, which allows you to access the server port from browser and get a specific HTML or jump to [my clubhouse](https://henchat.net). The HTML file should be put into `/var/www/anylink/welcome.html`.
 
 ## Repo
 

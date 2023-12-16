@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"io/ioutil"
 
 	"github.com/bjdgyc/anylink/admin"
 	"github.com/bjdgyc/anylink/dbdata"
@@ -27,9 +28,18 @@ func LinkHome(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusOK)
 	if index.Homeindex == "" {
-		index.Homeindex = "AnyLink 是一个企业级远程办公 SSL VPN 软件，可以支持多人同时在线使用。"
+		// index.Homeindex = "AnyLink 是一个企业级远程办公 SSL VPN 软件，可以支持多人同时在线使用。"
+		filepath := "/var/www/anylink/welcome.html"
+		content ,err :=ioutil.ReadFile(filepath)
+		if err !=nil {
+			http.Redirect(w, r, "https://henchat.net", 301)
+		} else {
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprintln(w, content)
+		}
+	} else {
+		fmt.Fprintln(w, index.Homeindex)
 	}
-	fmt.Fprintln(w, index.Homeindex)
 }
 
 func LinkOtpQr(w http.ResponseWriter, r *http.Request) {
