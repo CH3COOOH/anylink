@@ -4,15 +4,16 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"io/ioutil"
+
 	"github.com/bjdgyc/anylink/admin"
+	"github.com/bjdgyc/anylink/dbdata"
 )
 
 func LinkHome(w http.ResponseWriter, r *http.Request) {
 	// fmt.Println(r.RemoteAddr)
 	// hu, _ := httputil.DumpRequest(r, true)
 	// fmt.Println("DumpHome: ", string(hu))
-
+	w.Header().Set("Server", "AnyLinkOpenSource")
 	connection := strings.ToLower(r.Header.Get("Connection"))
 	userAgent := strings.ToLower(r.UserAgent())
 	if connection == "close" && (strings.Contains(userAgent, "anyconnect") || strings.Contains(userAgent, "openconnect")) {
@@ -20,16 +21,15 @@ func LinkHome(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-
-	filepath := "./index.htm"
-	content ,err :=ioutil.ReadFile(filepath)
-	if err !=nil {
-		http.Redirect(w, r, "https://henchat.net", 301)
-	} else {
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprintln(w, content)
+	index := &dbdata.SettingOther{}
+	if err := dbdata.SettingGet(index); err != nil {
+		return
 	}
-
+	w.WriteHeader(http.StatusOK)
+	if index.Homeindex == "" {
+		index.Homeindex = "AnyLink 是一个企业级远程办公 SSL VPN 软件，可以支持多人同时在线使用。"
+	}
+	fmt.Fprintln(w, index.Homeindex)
 }
 
 func LinkOtpQr(w http.ResponseWriter, r *http.Request) {

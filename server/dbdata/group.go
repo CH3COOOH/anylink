@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/bjdgyc/anylink/base"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
 )
 
 const (
@@ -16,6 +18,9 @@ const (
 	Deny  = "deny"
 	All   = "all"
 )
+
+// 域名分流最大字符2万
+const DsMaxLen = 20000
 
 type GroupLinkAcl struct {
 	// 自上而下匹配 默认 allow * *
@@ -30,6 +35,11 @@ type ValData struct {
 	Val    string `json:"val"`
 	IpMask string `json:"ip_mask"`
 	Note   string `json:"note"`
+}
+
+type GroupNameId struct {
+	Id   int    `json:"id"`
+	Name string `json:"name"`
 }
 
 // type Group struct {
@@ -64,6 +74,34 @@ func GetGroupNames() []string {
 	return names
 }
 
+func GetGroupNamesNormal() []string {
+	var datas []Group
+	err := FindWhere(&datas, 0, 0, "status=1")
+	if err != nil {
+		base.Error(err)
+		return nil
+	}
+	var names []string
+	for _, v := range datas {
+		names = append(names, v.Name)
+	}
+	return names
+}
+
+func GetGroupNamesIds() []GroupNameId {
+	var datas []Group
+	err := Find(&datas, 0, 0)
+	if err != nil {
+		base.Error(err)
+		return nil
+	}
+	var names []GroupNameId
+	for _, v := range datas {
+		names = append(names, GroupNameId{Id: v.Id, Name: v.Name})
+	}
+	return names
+}
+
 func SetGroup(g *Group) error {
 	var err error
 	if g.Name == "" {
@@ -79,9 +117,16 @@ func SetGroup(g *Group) error {
 				continue
 			}
 
-			ipMask, _, err := parseIpNet(v.Val)
+			ipMask, ipNet, err := parseIpNet(v.Val)
+
 			if err != nil {
 				return errors.New("RouteInclude 错误" + err.Error())
+			}
+
+			// 给Mac系统下发路由时，必须是标准的网络地址
+			if strings.Split(ipMask, "/")[0] != ipNet.IP.String() {
+				errMsg := fmt.Sprintf("RouteInclude 错误: 网络地址错误，建议： %s 改为 %s", v.Val, ipNet)
+				return errors.New(errMsg)
 			}
 
 			v.IpMask = ipMask
@@ -92,10 +137,16 @@ func SetGroup(g *Group) error {
 	routeExclude := []ValData{}
 	for _, v := range g.RouteExclude {
 		if v.Val != "" {
-			ipMask, _, err := parseIpNet(v.Val)
+			ipMask, ipNet, err := parseIpNet(v.Val)
 			if err != nil {
 				return errors.New("RouteExclude 错误" + err.Error())
 			}
+
+			if strings.Split(ipMask, "/")[0] != ipNet.IP.String() {
+				errMsg := fmt.Sprintf("RouteInclude 错误: 网络地址错误，建议： %s 改为 %s", v.Val, ipNet)
+				return errors.New(errMsg)
+			}
+
 			v.IpMask = ipMask
 			routeExclude = append(routeExclude, v)
 		}
@@ -126,10 +177,10 @@ func SetGroup(g *Group) error {
 			clientDns = append(clientDns, v)
 		}
 	}
-	if len(routeInclude) == 0 || (len(routeInclude) == 1 && routeInclude[0].Val == "all") {
-		if len(clientDns) == 0 {
-			return errors.New("默认路由，必须设置一个DNS")
-		}
+	// 是否默认路由
+	isDefRoute := len(routeInclude) == 0 || (len(routeInclude) == 1 && routeInclude[0].Val == "all")
+	if isDefRoute && len(clientDns) == 0 {
+		return errors.New("默认路由，必须设置一个DNS")
 	}
 	g.ClientDns = clientDns
 	// 域名拆分隧道，不能同时填写
@@ -147,6 +198,9 @@ func SetGroup(g *Group) error {
 	err = CheckDomainNames(g.DsExcludeDomains)
 	if err != nil {
 		return errors.New("排除域名有误：" + err.Error())
+	}
+	if isDefRoute && g.DsIncludeDomains != "" {
+		return errors.New("默认路由, 不允许设置\"包含域名\", 请重新配置")
 	}
 	// 处理登入方式的逻辑
 	defAuth := map[string]interface{}{
@@ -184,6 +238,21 @@ func SetGroup(g *Group) error {
 	return err
 }
 
+func GroupAuthLogin(name, pwd string, authData map[string]interface{}) error {
+	g := &Group{Auth: authData}
+	authType := g.Auth["type"].(string)
+	if _, ok := authRegistry[authType]; !ok {
+		return errors.New("未知的认证方式: " + authType)
+	}
+	auth := makeInstance(authType).(IUserAuth)
+	err := auth.checkData(g.Auth)
+	if err != nil {
+		return err
+	}
+	err = auth.checkUser(name, pwd, g)
+	return err
+}
+
 func parseIpNet(s string) (string, *net.IPNet, error) {
 	ip, ipNet, err := net.ParseCIDR(s)
 	if err != nil {
@@ -200,6 +269,7 @@ func CheckDomainNames(domains string) error {
 	if domains == "" {
 		return nil
 	}
+	strLen := 0
 	str_slice := strings.Split(domains, ",")
 	for _, val := range str_slice {
 		if val == "" {
@@ -208,6 +278,11 @@ func CheckDomainNames(domains string) error {
 		if !ValidateDomainName(val) {
 			return errors.New(val + " 域名有误")
 		}
+		strLen += len(val)
+	}
+	if strLen > DsMaxLen {
+		p := message.NewPrinter(language.English)
+		return fmt.Errorf("字符长度超出限制，最大%s个(不包含逗号), 请删减一些域名", p.Sprintf("%d", DsMaxLen))
 	}
 	return nil
 }

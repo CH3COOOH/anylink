@@ -1,4 +1,4 @@
-#!/bin/env bash
+#!/bin/bash
 
 set -x
 function RETVAL() {
@@ -12,6 +12,9 @@ function RETVAL() {
 #当前目录
 cpath=$(pwd)
 
+ver=`cat server/base/app_ver.go | grep APP_VER | awk '{print $3}' | sed 's/"//g'`
+echo "当前版本 $ver"
+
 echo "编译前端项目"
 cd $cpath/web
 #国内可替换源加快速度
@@ -20,8 +23,9 @@ cd $cpath/web
 #npm install
 #npm run build
 
-yarn install
+yarn install --registry=https://registry.npmmirror.com
 yarn run build
+
 
 RETVAL $?
 
@@ -43,7 +47,7 @@ rm -rf $deploy ${deploy}.tar.gz
 mkdir $deploy
 
 cp -r server/anylink $deploy
-cp -r server/bridge-init.sh $deploy
+#cp -r server/bridge-init.sh $deploy
 cp -r server/conf $deploy
 
 cp -r systemd $deploy

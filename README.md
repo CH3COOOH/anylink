@@ -1,6 +1,6 @@
 # AnyLink
 
-[![Go](https://github.com/bjdgyc/anylink/workflows/Go/badge.svg?branch=master)](https://github.com/bjdgyc/anylink/actions)
+[![Go](https://github.com/bjdgyc/anylink/workflows/Go/badge.svg?branch=main)](https://github.com/bjdgyc/anylink/actions)
 [![PkgGoDev](https://pkg.go.dev/badge/github.com/bjdgyc/anylink)](https://pkg.go.dev/github.com/bjdgyc/anylink)
 [![Go Report Card](https://goreportcard.com/badge/github.com/bjdgyc/anylink)](https://goreportcard.com/report/github.com/bjdgyc/anylink)
 [![codecov](https://codecov.io/gh/bjdgyc/anylink/branch/master/graph/badge.svg?token=JTFLIIIBQ0)](https://codecov.io/gh/bjdgyc/anylink)
@@ -24,7 +24,7 @@ AnyLink 基于 [ietf-openconnect](https://tools.ietf.org/html/draft-mavrogiannop
 
 AnyLink 使用 TLS/DTLS 进行数据加密，因此需要 RSA 或 ECC 证书，可以通过 Let's Encrypt 和 TrustAsia 申请免费的 SSL 证书。
 
-AnyLink 服务端仅在 CentOS 7、Ubuntu 18.04 测试通过，如需要安装在其他系统，需要服务端支持 tun/tap 功能、ip 设置命令。
+AnyLink 服务端仅在 CentOS 7、CentOS 8、Ubuntu 18.04、Ubuntu 20.04 测试通过，如需要安装在其他系统，需要服务端支持 tun/tap 功能、ip 设置命令。
 
 ## Screenshot
 
@@ -54,11 +54,13 @@ AnyLink 服务端仅在 CentOS 7、Ubuntu 18.04 测试通过，如需要安装�
 >
 > 客户端请使用群共享文件的版本，其他版本没有测试过，不保证使用正常
 > 
+> 其他问题 [前往查看](doc/question.md)
+> 
 > 首次使用，请在浏览器访问 https://域名:443，浏览器提示安全后，在客户端输入 【域名:443】 即可
 
 ### 自行编译安装
 
-> 需要提前安装好 golang >= 1.17 和 nodejs >= 14.x 和 yarn >= v1.22.x
+> 需要提前安装好 golang >= 1.19 和 nodejs >= 14.x 和 yarn >= v1.22.x
 
 ```shell
 git clone https://github.com/bjdgyc/anylink.git
@@ -71,6 +73,7 @@ cd anylink-deploy
 sudo ./anylink
 
 # 默认管理后台访问地址
+# 注意该host为anylink的内网ip,不能跟客户端请求的ip一样
 # https://host:8800
 # 默认账号 密码
 # admin 123456
@@ -88,7 +91,7 @@ sudo ./anylink
 - [x] 基于 tun 设备的 nat 访问模式
 - [x] 基于 tap 设备的桥接访问模式
 - [x] 基于 macvtap 设备的桥接访问模式
-- [x] 支持 [proxy protocol v1](http://www.haproxy.org/download/2.2/doc/proxy-protocol.txt) 协议
+- [x] 支持 [proxy protocol v1&v2](http://www.haproxy.org/download/2.2/doc/proxy-protocol.txt) 协议
 - [x] 用户组支持
 - [x] 多用户支持
 - [x] 用户策略支持
@@ -141,7 +144,7 @@ sudo ./anylink
 1. 开启服务器转发
 
 ```shell
-# flie: /etc/sysctl.conf
+# file: /etc/sysctl.conf
 net.ipv4.ip_forward = 1
 
 #执行如下命令
@@ -151,19 +154,42 @@ sysctl -w net.ipv4.ip_forward=1
 cat /proc/sys/net/ipv4/ip_forward
 ```
 
-2. 设置 nat 转发规则
+2.1 设置 nat 转发规则(二选一)
 
 ```shell
 systemctl stop firewalld.service
 systemctl disable firewalld.service
 
+# 新版本支持自动设置nat转发，如有其他需求可以参考下面的命令配置
+
 # 请根据服务器内网网卡替换 eth0
-iptables -t nat -A POSTROUTING -s 192.168.10.0/24 -o eth0 -j MASQUERADE
+# iptables -t nat -A POSTROUTING -s 192.168.90.0/24 -o eth0 -j MASQUERADE
 # 如果执行第一个命令不生效，可以继续执行下面的命令
-# iptables -A FORWARD -i eth0 -s 192.168.10.0/24 -j ACCEPT
+# iptables -A FORWARD -i eth0 -s 192.168.90.0/24 -j ACCEPT
 # 查看设置是否生效
-iptables -nL -t nat
+# iptables -nL -t nat
 ```
+
+2.2 使用全局路由转发(二选一)
+
+```shell
+# 假设anylink所在服务器的内网ip: 10.1.2.10
+
+# 首先关闭nat转发功能
+iptables_nat = false
+
+# 传统网络架构，在华三交换机添加以下静态路由规则
+ip route-static 192.168.90.0 255.255.255.0 10.1.2.10
+# 其他品牌的交换机命令，请参考以下地址
+https://cloud.tencent.com/document/product/216/62007
+
+# 公有云环境下，需设置vpc下的路由表，添加以下路由策略
+目的端: 192.168.90.0/24
+下一跳类型: 云服务器
+下一跳: 10.1.2.10
+
+```
+
 
 3. 使用 AnyConnect 客户端连接即可
 
@@ -175,45 +201,28 @@ iptables -nL -t nat
 > 以下参数可以通过执行 `ip a` 查看
 
 ```
+# 首先关闭nat转发功能
+iptables_nat = false
+
+# master网卡需要打开混杂模式
+ip link set dev eth0 promisc on
+
 #内网主网卡名称
 ipv4_master = "eth0"
 #以下网段需要跟ipv4_master网卡设置成一样
-ipv4_cidr = "192.168.10.0/24"
-ipv4_gateway = "192.168.10.1"
-ipv4_start = "192.168.10.100"
-ipv4_end = "192.168.10.200"
+ipv4_cidr = "10.1.2.0/24"
+ipv4_gateway = "10.1.2.1"
+ipv4_start = "10.1.2.100"
+ipv4_end = "10.1.2.200"
 ```
 
-### ~~tap 设置~~
-
-1. 创建桥接网卡
-
-```
-注意 server.toml 的ip参数，需要与 bridge-init.sh 的配置参数一致
-```
-
-2. 修改 bridge-init.sh 内的参数
-
-> 以下参数可以通过执行 `ip a` 查看
-
-```
-eth="eth0"
-eth_ip="192.168.10.4/24"
-eth_broadcast="192.168.10.255"
-eth_gateway="192.168.10.1"
-```
-
-3. 执行 bridge-init.sh 文件
-
-```
-sh bridge-init.sh
-```
 
 ## Systemd
 
 1. 添加 anylink 程序
 
     - anylink 程序目录放入 `/usr/local/anylink-deploy`
+    - 添加执行权限 `chmod +x /usr/local/anylink-deploy/anylink`
 
 2. systemd/anylink.service 脚本放入：
 
@@ -231,6 +240,8 @@ sh bridge-init.sh
 1. 获取镜像
 
    ```bash
+   # 具体tag可以从docker hub获取
+   # https://hub.docker.com/r/bjdgyc/anylink/tags
    docker pull bjdgyc/anylink:latest
    ```
 
@@ -257,9 +268,7 @@ sh bridge-init.sh
 5. 启动容器
 
    ```bash
-   # -e IPV4_CIDR=192.168.10.0/24 这个参数要与配置文件内的网段一致
    docker run -itd --name anylink --privileged \
-       -e IPV4_CIDR=192.168.10.0/24
        -p 443:443 -p 8800:8800 \
        --restart=always \
        bjdgyc/anylink
@@ -269,7 +278,6 @@ sh bridge-init.sh
    ```bash
    # 参数可以参考 -h 命令
    docker run -itd --name anylink --privileged \
-       -e IPV4_CIDR=192.168.10.0/24 \
        -p 443:443 -p 8800:8800 \
        --restart=always \
        bjdgyc/anylink \
@@ -282,7 +290,7 @@ sh bridge-init.sh
    #获取仓库源码
    git clone https://github.com/bjdgyc/anylink.git
    # 构建镜像
-   docker build -t anylink .
+   docker build -t anylink -f docker/Dockerfile .
    ```
 
 
@@ -292,7 +300,8 @@ sh bridge-init.sh
 
 ## Discussion
 
-添加QQ群: 567510628
+添加QQ群(1): 567510628
+添加QQ群(2): 739072205
 
 群共享文件有相关软件下载
 
@@ -324,7 +333,7 @@ sh bridge-init.sh
 
 ## License
 
-本项目采用 MIT 开源授权许可证，完整的授权说明已放置在 LICENSE 文件中。
+本项目采用 AGPL-3.0 开源授权许可证，完整的授权说明已放置在 LICENSE 文件中。
 
 ## Thank
 
