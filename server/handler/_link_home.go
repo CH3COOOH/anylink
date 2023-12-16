@@ -19,7 +19,7 @@ func LinkHome(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusOK)
-	if index.Homeindex == "" {
+if index.Homeindex == "" {
 		// index.Homeindex = "AnyLink 是一个企业级远程办公 SSL VPN 软件，可以支持多人同时在线使用。"
 		filepath := "/var/www/anylink/welcome.html"
 		content ,err :=ioutil.ReadFile(filepath)
@@ -30,6 +30,7 @@ func LinkHome(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintln(w, content)
 		}
 	} else {
+		w.WriteHeader(http.StatusOK)
 		fmt.Fprintln(w, index.Homeindex)
 	}
 }
